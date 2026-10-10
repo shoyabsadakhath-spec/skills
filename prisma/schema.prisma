@@ -1,0 +1,155 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AnimeStatus {
+  FINISHED_AIRING
+  CURRENTLY_AIRING
+  UPCOMING
+  UNKNOWN
+}
+
+model Anime {
+  malId    Int    @id
+  title    String
+  synopsis String @db.VarChar(512)
+  image    String
+  score    Float
+  rating   String
+  type     String
+  episodes Int    @map("episodeCount")
+
+  genre  String?
+  status AnimeStatus?
+
+  createdAt   DateTime @default(now())
+  lastUpdated DateTime @updatedAt
+
+  episode    Episode[]
+  genreAnime GenreRecommendation[]
+}
+
+model GenreRecommendation {
+  malId Int
+  genre String
+  index Int
+  anime Anime  @relation(fields: [malId], references: [malId])
+
+  @@id([genre, index])
+}
+
+model TrendingAnime {
+  index     Int      @id
+  malId     Int
+  poster    String
+  createdAt DateTime @default(now())
+
+  title    String
+  synopsis String
+  episodes Int
+  rating   String
+}
+
+model AnimeProvider {
+  malId      Int
+  provider   String
+  providerId String
+
+  @@id([malId, provider])
+}
+
+model Episode {
+  id             String           @id @default(uuid())
+  number         Int
+  animeMalId     Int
+  length         Int
+  episodeHistory EpisodeHistory[]
+  anime          Anime            @relation(fields: [animeMalId], references: [malId])
+
+  @@unique([animeMalId, number, length])
+}
+
+model EpisodeProvider {
+  id                String @id @default(uuid())
+  provider          String
+  episodeProviderId String // episodeId in provider
+  episodeNumber     Int
+  animeId           Int
+
+  source      String? @db.VarChar(512)
+  episodeId   String?
+  exactLength Int?
+  title       String?
+
+  skipTimes SkipTime[]
+
+  @@unique([provider, animeId, episodeProviderId])
+}
+
+enum SkipType {
+  OPENING
+  ENDING
+}
+
+model SkipTime {
+  episodeProviderId String
+
+  type            SkipType
+  start           Int
+  end             Int
+  episodeProvider EpisodeProvider? @relation(fields: [episodeProviderId], references: [id])
+
+  @@id([episodeProviderId, type])
+  @@index([episodeProviderId])
+}
+
+model EpisodeHistory {
+  episodeId String
+  userId    String
+  watchTime Int
+  episode   Episode @relation(fields: [episodeId], references: [id])
+
+  @@id([episodeId, userId])
+  @@index([episodeId])
+}
+
+model AuthUser {
+  id           String        @id @unique
+  auth_session AuthSession[]
+  auth_key     AuthKey[]
+  // here you can add custom fields for your user
+  // e.g. name, email, username, roles, etc.
+
+  @@map("auth_user")
+}
+
+model AuthSession {
+  id             String   @id @unique
+  user_id        String
+  active_expires BigInt
+  idle_expires   BigInt
+  auth_user      AuthUser @relation(references: [id], fields: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("auth_session")
+}
+
+model AuthKey {
+  id              String   @id @unique
+  hashed_password String?
+  user_id         String
+  primary_key     Boolean
+  expires         BigInt?
+  auth_user       AuthUser @relation(references: [id], fields: [user_id], onDelete: Cascade)
+
+  @@index([user_id])
+  @@map("auth_key")
+}
